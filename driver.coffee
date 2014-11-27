@@ -10,7 +10,7 @@ winston.add(winston.transports.Console, { timestamp: ( -> new Date() ) })
 console.log = winston.info
 
 houmioBridge = process.env.HOUMIO_BRIDGE || "ws://localhost:3001"
-enOceanDeviceFile = process.env.HOUMIO_ENOCEAN_DEVICE_FILE || "/dev/cu.usbserial-FTXMJM92"
+enOceanDeviceFile = process.env.HOUMIO_ENOCEAN_DEVICE_FILE || "/dev/cu.usbserial-FTXMIMLY"
 
 console.log "Using HOUMIO_BRIDGE=#{houmioBridge}"
 console.log "Using HOUMIO_ENOCEAN_DEVICE_FILE=#{enOceanDeviceFile}"
@@ -61,7 +61,7 @@ enOceanIsDataLengthValid = (data) ->
 onSocketOpen = ->
   console.log "Connected to #{houmioBridge}"
   pingId = setInterval ( -> socket.ping(null, {}, false) ), 3000
-  publish = JSON.stringify { command: "driverReady", data: { protocol: "enocean" } }
+  publish = JSON.stringify { command: "driverReady", protocol: "enocean" }
   socket.send(publish)
   console.log "Sent message:", publish
 
@@ -81,7 +81,7 @@ toCommaSeparatedHexString = (ints) ->
   ints.map(toHexString).map(addZeroes).join(':')
 
 sendData = (d) ->
-  o = { command: "data", data: d }
+  o = { command: "data", protocol: "enocean", data: d }
   s = JSON.stringify o
   socket.send s
   console.log "Sent data:", toCommaSeparatedHexString(JSON.parse(s).data)
