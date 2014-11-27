@@ -1,0 +1,26 @@
+{
+  "name": "houmio-driver-enocean",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/goodlookingbody/houmio-driver-enocean.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/goodlookingbody/houmio-driver-enocean/issues"
+  },
+  "homepage": "https://github.com/goodlookingbody/houmio-driver-enocean",
+  "dependencies": {
+    "baconjs": "^0.7.37",
+    "winston": "^0.8.3",
+    "sleep": "^1.1.8",
+    "ws": "^0.5.0",
+    "serialport": "^1.4.6"
+  }
+}
