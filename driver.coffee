@@ -3,6 +3,7 @@ serialport = require("serialport")
 sleep = require('sleep')
 WebSocket = require('ws')
 winston = require('winston')
+zerofill = require('zerofill')
 
 winston.remove(winston.transports.Console)
 winston.add(winston.transports.Console, { timestamp: ( -> new Date() ) })
@@ -74,10 +75,16 @@ onSocketMessage = (s) ->
     message = JSON.parse s
     enOceanData.push message.data
 
+toCommaSeparatedHexString = (ints) ->
+  toHexString = (i) -> i.toString(16)
+  addZeroes = (s) -> zerofill(s, 2)
+  ints.map(toHexString).map(addZeroes).join(':')
+
 sendData = (d) ->
-  s = JSON.stringify { command: "data", data: d }
+  o = { command: "data", data: d }
+  s = JSON.stringify o
   socket.send s
-  console.log "Sent message:", s
+  console.log "Sent data:", toCommaSeparatedHexString(JSON.parse(s).data)
 
 onEnOceanSerialData = (data) ->
   if data[0] == enOceanStartByte && enOceanSerialBuffer == null
