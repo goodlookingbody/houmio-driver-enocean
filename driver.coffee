@@ -74,11 +74,16 @@ onSocketMessage = (s) ->
     message = JSON.parse s
     enOceanData.push message.data
 
+sendData = (d) ->
+  s = JSON.stringify { command: "data", data: d }
+  socket.send s
+  console.log "Sent message:", s
+
 onEnOceanSerialData = (data) ->
   if data[0] == enOceanStartByte && enOceanSerialBuffer == null
     onEnOceanTimeoutObj = setTimeout onEnOceanTimeout, 100
     if enOceanIsDataValid data
-      socket.send JSON.stringify { command: "enoceandata", data: data }
+      sendData data
       enOceanSerialBuffer = null
       clearTimeout onEnOceanTimeoutObj
     else
@@ -86,9 +91,7 @@ onEnOceanSerialData = (data) ->
   else if enOceanSerialBuffer != null
     enOceanSerialBuffer = Buffer.concat [enOceanSerialBuffer, data]
     if enOceanIsDataValid enOceanSerialBuffer
-      datamessage = JSON.stringify { command: "enoceandata", data: enOceanSerialBuffer }
-      socket.send datamessage
-      console.log "Sent message:", datamessage
+      sendData enOceanSerialBuffer
       enOceanSerialBuffer = null
       clearTimeout onEnOceanTimeoutObj
 
