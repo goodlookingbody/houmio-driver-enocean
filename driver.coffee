@@ -81,7 +81,7 @@ toCommaSeparatedHexString = (ints) ->
   ints.map(toHexString).map(addZeroes).join(':')
 
 sendData = (d) ->
-  o = { command: "data", protocol: "enocean", data: d }
+  o = { command: "driverData", protocol: "enocean", data: d }
   s = JSON.stringify o
   socket.send s
   console.log "Sent data:", toCommaSeparatedHexString(JSON.parse(s).data)
