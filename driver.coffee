@@ -84,7 +84,7 @@ sendData = (d) ->
   o = { command: "driverData", protocol: "enocean", data: d }
   s = JSON.stringify o
   socket.send s
-  console.log "Sent data:", toCommaSeparatedHexString(JSON.parse(s).data)
+  console.log "Sent driver data:", toCommaSeparatedHexString(JSON.parse(s).data)
 
 onEnOceanSerialData = (data) ->
   if data[0] == enOceanStartByte && enOceanSerialBuffer == null
