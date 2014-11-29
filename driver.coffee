@@ -1,7 +1,8 @@
 Bacon = require('baconjs')
+carrier = require('carrier')
+net = require('net')
 serialport = require("serialport")
 sleep = require('sleep')
-WebSocket = require('ws')
 winston = require('winston')
 zerofill = require('zerofill')
 
@@ -9,7 +10,7 @@ winston.remove(winston.transports.Console)
 winston.add(winston.transports.Console, { timestamp: ( -> new Date() ) })
 console.log = winston.info
 
-houmioBridge = process.env.HOUMIO_BRIDGE || "ws://localhost:3001"
+houmioBridge = process.env.HOUMIO_BRIDGE || "localhost:3001"
 enOceanDeviceFile = process.env.HOUMIO_ENOCEAN_DEVICE_FILE || "/dev/cu.usbserial-FTXMIMLY"
 
 console.log "Using HOUMIO_BRIDGE=#{houmioBridge}"
@@ -60,20 +61,19 @@ enOceanIsDataLengthValid = (data) ->
 
 onSocketOpen = ->
   console.log "Connected to #{houmioBridge}"
-  pingId = setInterval ( -> socket.ping(null, {}, false) ), 3000
-  publish = JSON.stringify { command: "driverReady", protocol: "enocean" }
-  socket.send(publish)
-  console.log "Sent message:", publish
+  socket.write (JSON.stringify { command: "driverReady", protocol: "enocean"}) + "\n"
+  carrier.carry socket, onSocketData
+  socket.on 'close', onSocketClose
+  socket.on 'error', (err) -> console.log err
 
 onSocketClose = ->
-  clearInterval pingId
   exit "Disconnected from #{houmioBridge}"
 
-onSocketMessage = (s) ->
-  console.log "Received message:", s
+onSocketData = (line) ->
   try
-    message = JSON.parse s
+    message = JSON.parse line
     enOceanData.push message.data
+    console.log "Wrote to serial port:", toCommaSeparatedHexString message.data
 
 toCommaSeparatedHexString = (ints) ->
   toHexString = (i) -> i.toString(16)
@@ -83,7 +83,7 @@ toCommaSeparatedHexString = (ints) ->
 sendData = (d) ->
   o = { command: "driverData", protocol: "enocean", data: d }
   s = JSON.stringify o
-  socket.send s
+  socket.write s + "\n"
   console.log "Sent driver data:", toCommaSeparatedHexString(JSON.parse(s).data)
 
 onEnOceanSerialData = (data) ->
@@ -106,12 +106,8 @@ onEnOceanSerialOpen = ->
   console.log 'Serial port opened:', enOceanDeviceFile
   enOceanSerial.on 'data', onEnOceanSerialData
   writeReady.push(true)
-  socket = new WebSocket(houmioBridge)
-  socket.on 'open', onSocketOpen
-  socket.on 'close', onSocketClose
-  socket.on 'error', exit
-  socket.on 'ping', -> socket.pong()
-  socket.on 'message', onSocketMessage
+  socket = new net.Socket()
+  socket.connect houmioBridge.split(":")[1], houmioBridge.split(":")[0], onSocketOpen
 
 onEnOceanSerialError = (err) ->
   exit "An error occurred in EnOcean serial port: #{err}"
