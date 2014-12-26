@@ -11,7 +11,7 @@ winston.add(winston.transports.Console, { timestamp: ( -> new Date() ) })
 console.log = winston.info
 
 houmioBridge = process.env.HOUMIO_BRIDGE || "localhost:3001"
-enOceanDeviceFile = process.env.HOUMIO_ENOCEAN_DEVICE_FILE || "/dev/cu.usbserial-FTXMIMLY"
+enOceanDeviceFile = process.env.HOUMIO_ENOCEAN_DEVICE_FILE || "/dev/ttyAMA0"
 
 console.log "Using HOUMIO_BRIDGE=#{houmioBridge}"
 console.log "Using HOUMIO_ENOCEAN_DEVICE_FILE=#{enOceanDeviceFile}"
