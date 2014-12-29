@@ -1,122 +1,89 @@
-Bacon = require('baconjs')
-carrier = require('carrier')
-net = require('net')
-serialport = require("serialport")
-sleep = require('sleep')
-winston = require('winston')
-zerofill = require('zerofill')
-
-winston.remove(winston.transports.Console)
-winston.add(winston.transports.Console, { timestamp: ( -> new Date() ) })
-console.log = winston.info
+async = require 'async'
+Bacon = require 'baconjs'
+carrier = require 'carrier'
+enocean = require './enocean'
+net = require 'net'
+serialport = require 'serialport'
+winston = require 'winston'
+zerofill = require 'zerofill'
 
 houmioBridge = process.env.HOUMIO_BRIDGE || "localhost:3001"
-enOceanDeviceFile = process.env.HOUMIO_ENOCEAN_DEVICE_FILE || "/dev/ttyAMA0"
+enoceanDeviceFile = process.env.HOUMIO_ENOCEAN_DEVICE_FILE || "/dev/ttyAMA0"
+enoceanSerialConfig = { baudrate: 57600, parser: serialport.parsers.raw }
+enoceanSerial = new serialport.SerialPort enoceanDeviceFile, enoceanSerialConfig, true
+bridgeSocket = new net.Socket()
 
 console.log "Using HOUMIO_BRIDGE=#{houmioBridge}"
-console.log "Using HOUMIO_ENOCEAN_DEVICE_FILE=#{enOceanDeviceFile}"
+console.log "Using HOUMIO_ENOCEAN_DEVICE_FILE=#{enoceanDeviceFile}"
 
 exit = (msg) ->
   console.log msg
   process.exit 1
 
-enOceanSerialBuffer = null
-onEnOceanTimeoutObj = null
-socket = null
-pingId = null
-
-enOceanData = new Bacon.Bus()
-writeReady = new Bacon.Bus()
-
-enOceanWriteAndDrain = (data, callback) ->
-  enOceanSerial.write data, (err, res) ->
-    enOceanSerial.drain callback
-
-enOceanData
-  .zip(writeReady, (d, w) -> d)
-  .flatMap (d) -> Bacon.fromNodeCallback(enOceanWriteAndDrain, d)
-  .onValue (err) ->
-    sleep.usleep(0.01*1000000)
-    writeReady.push(true)
-
-enOceanStartByte = 0x55
-
-enOceanHeaderLength = 6
-
-onEnOceanTimeout = () ->
-  enOceanSerialBuffer = null
-  clearTimeout onEnOceanTimeoutObj
-
-enOceanIsDataValid = (cmd) ->
-  if cmd.length < 7 then return false
-  if cmd[0] != enOceanStartByte then return false
-  if !enOceanIsDataLengthValid(cmd) then return false
-  true
-
-enOceanIsDataLengthValid = (data) ->
-  dataLen = data[1] * 0xff + data[2]
-  optLen = data[3]
-  totalLen = enOceanHeaderLength + dataLen + optLen + 1
-  data.length == totalLen
-
-onSocketOpen = ->
-  console.log "Connected to #{houmioBridge}"
-  socket.write (JSON.stringify { command: "driverReady", protocol: "enocean"}) + "\n"
-  carrier.carry socket, onSocketData
-  socket.on 'close', onSocketClose
-  socket.on 'error', (err) -> console.log err
-
-onSocketClose = ->
-  exit "Disconnected from #{houmioBridge}"
-
-onSocketData = (line) ->
-  try
-    message = JSON.parse line
-    enOceanData.push message.data
-    console.log "Wrote to serial port:", toCommaSeparatedHexString message.data
-
-toCommaSeparatedHexString = (ints) ->
+toSemicolonSeparatedHexString = (bytes) ->
   toHexString = (i) -> i.toString(16)
   addZeroes = (s) -> zerofill(s, 2)
-  ints.map(toHexString).map(addZeroes).join(':')
+  bytes.map(toHexString).map(addZeroes).join(':')
 
-sendData = (d) ->
-  o = { command: "driverData", protocol: "enocean", data: d }
-  s = JSON.stringify o
-  socket.write s + "\n"
-  console.log "Sent driver data:", toCommaSeparatedHexString(JSON.parse(s).data)
+toEnoceanBuffers = (serial) ->
+  Bacon.fromBinder (sink) ->
+    serial.on "data", sink
+    serial.on "close", -> sink new Bacon.End()
+    serial.on "error", (err) -> sink new Bacon.Error(err)
+    ( -> )
 
-onEnOceanSerialData = (data) ->
-  if data[0] == enOceanStartByte && enOceanSerialBuffer == null
-    onEnOceanTimeoutObj = setTimeout onEnOceanTimeout, 100
-    if enOceanIsDataValid data
-      sendData data
-      enOceanSerialBuffer = null
-      clearTimeout onEnOceanTimeoutObj
-    else
-      enOceanSerialBuffer = data.slice 0, data.length
-  else if enOceanSerialBuffer != null
-    enOceanSerialBuffer = Buffer.concat [enOceanSerialBuffer, data]
-    if enOceanIsDataValid enOceanSerialBuffer
-      sendData enOceanSerialBuffer
-      enOceanSerialBuffer = null
-      clearTimeout onEnOceanTimeoutObj
+toEnoceanMessages = (buffers) ->
+  buffers
+    .filter enocean.bufferStartsWithStartByte
+    .flatMap (buffer) -> buffers.startWith(buffer).bufferWithTime(100).take(1)
+    .map Buffer.concat
+    .filter enocean.bufferHasValidLength
 
-onEnOceanSerialOpen = ->
-  console.log 'Serial port opened:', enOceanDeviceFile
-  enOceanSerial.on 'data', onEnOceanSerialData
-  writeReady.push(true)
-  socket = new net.Socket()
-  socket.connect houmioBridge.split(":")[1], houmioBridge.split(":")[0], onSocketOpen
+toLines = (socket) ->
+  Bacon.fromBinder (sink) ->
+    carrier.carry socket, sink
+    socket.on "close", -> sink new Bacon.End()
+    socket.on "error", (err) -> sink new Bacon.Error(err)
+    ( -> )
 
-onEnOceanSerialError = (err) ->
-  exit "An error occurred in EnOcean serial port: #{err}"
+openBridgeMessageStream = (socket) -> (cb) ->
+  socket.connect houmioBridge.split(":")[1], houmioBridge.split(":")[0], ->
+    lineStream = toLines socket
+    messageStream = lineStream.map JSON.parse
+    cb null, messageStream
 
-onEnOceanSerialClose = (err) ->
-  exit "EnOcean serial port closed, reason: #{err}"
+openEnoceanMessageStream = (enoceanSerial) -> (cb) ->
+  enoceanSerial.on 'open', ->
+    messageStream = toEnoceanMessages toEnoceanBuffers enoceanSerial
+    cb null, messageStream
 
-enOceanSerialConfig = { baudrate: 57600, parser: serialport.parsers.raw }
-enOceanSerial = new serialport.SerialPort enOceanDeviceFile, enOceanSerialConfig, true
-enOceanSerial.on "open", onEnOceanSerialOpen
-enOceanSerial.on "close", onEnOceanSerialClose
-enOceanSerial.on "error", onEnOceanSerialError
+bridgeMessagesToSerial = (bridgeStream, serial) ->
+  bridgeStream
+    .bufferingThrottle 10
+    .onValue (message) ->
+      serial.write message.data, ( -> )
+      console.log "<-- Enocean:", toSemicolonSeparatedHexString(message.data)
+
+toSocketMessage = (data) ->
+  object = { command: "driverData", protocol: "enocean", data: data }
+  string = JSON.stringify(object) + "\n"
+  { object, string }
+
+enoceanMessagesToSocket = (enoceanStream, socket) ->
+  enoceanStream
+    .map toSocketMessage
+    .onValue (message) ->
+      socket.write message.string
+      console.log "--> Bridge: ", toSemicolonSeparatedHexString(message.object.data.toJSON())
+
+openStreams = [ openBridgeMessageStream(bridgeSocket), openEnoceanMessageStream(enoceanSerial) ]
+
+async.series openStreams, (err, [bridgeStream, enoceanStream]) ->
+  if err then exit err
+  bridgeStream.onEnd -> exit "Bridge stream ended"
+  bridgeStream.onError (err) -> exit "Error from bridge stream:", err
+  enoceanStream.onEnd -> exit "Enocean stream ended"
+  enoceanStream.onError (err) -> exit "Error from Enocean stream:", err
+  bridgeMessagesToSerial bridgeStream, enoceanSerial
+  enoceanMessagesToSocket enoceanStream, bridgeSocket
+  bridgeSocket.write (JSON.stringify { command: "driverReady", protocol: "enocean"}) + "\n"
