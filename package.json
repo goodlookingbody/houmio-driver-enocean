@@ -11,6 +11,6 @@
     "zerofill": "^0.1.0"
   },
   "scripts": {
-    "start": "coffee driver.coffee"
+    "start": "coffee src/driver.coffee"
   }
 }
