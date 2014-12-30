@@ -76,9 +76,9 @@ enoceanMessagesToSocket = (enoceanStream, socket) ->
       socket.write message.string
       console.log "--> Bridge: ", toSemicolonSeparatedHexString(message.object.data.toJSON())
 
-openStreams = [ openBridgeMessageStream(bridgeSocket), openEnoceanMessageStream(enoceanSerial) ]
+openStreams = [ openEnoceanMessageStream(enoceanSerial), openBridgeMessageStream(bridgeSocket) ]
 
-async.series openStreams, (err, [bridgeStream, enoceanStream]) ->
+async.series openStreams, (err, [enoceanStream, bridgeStream]) ->
   if err then exit err
   bridgeStream.onEnd -> exit "Bridge stream ended"
   bridgeStream.onError (err) -> exit "Error from bridge stream:", err
