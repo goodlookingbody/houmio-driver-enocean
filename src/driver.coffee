@@ -46,6 +46,8 @@ toLines = (socket) ->
     socket.on "error", (err) -> sink new Bacon.Error(err)
     ( -> )
 
+isWriteMessage = (message) -> message.command is "write"
+
 openBridgeMessageStream = (socket) -> (cb) ->
   socket.connect houmioBridge.split(":")[1], houmioBridge.split(":")[0], ->
     lineStream = toLines socket
@@ -59,6 +61,7 @@ openEnoceanMessageStream = (enoceanSerial) -> (cb) ->
 
 bridgeMessagesToSerial = (bridgeStream, serial) ->
   bridgeStream
+    .filter isWriteMessage
     .bufferingThrottle 10
     .onValue (message) ->
       serial.write message.data, ( -> )
