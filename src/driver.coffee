@@ -90,3 +90,4 @@ async.series openStreams, (err, [enoceanStream, bridgeStream]) ->
   bridgeMessagesToSerial bridgeStream, enoceanSerial
   enoceanMessagesToSocket enoceanStream, bridgeSocket
   bridgeSocket.write (JSON.stringify { command: "driverReady", protocol: "enocean"}) + "\n"
+  enoceanSerial.write enocean.getSubDefBaseIdCommand(), ( -> )
