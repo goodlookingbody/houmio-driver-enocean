@@ -64,8 +64,9 @@ bridgeMessagesToSerial = (bridgeStream, serial) ->
     .filter isWriteMessage
     .bufferingThrottle 10
     .onValue (message) ->
+      console.log "Received message from bridge:", JSON.stringify message
       serial.write message.data, ( -> )
-      console.log "<-- Enocean:", toSemicolonSeparatedHexString(message.data)
+      console.log "Wrote to Enocean serial:", toSemicolonSeparatedHexString(message.data)
 
 toSocketMessage = (data) ->
   object = { command: "driverData", protocol: "enocean", data: data }
@@ -76,8 +77,9 @@ enoceanMessagesToSocket = (enoceanStream, socket) ->
   enoceanStream
     .map toSocketMessage
     .onValue (message) ->
+      console.log "Received data from Enocean serial:", message.object.data
       socket.write message.string
-      console.log "--> Bridge: ", toSemicolonSeparatedHexString(message.object.data.toJSON())
+      console.log "Wrote to bridge:", message.string.trim()
 
 openStreams = [ openEnoceanMessageStream(enoceanSerial), openBridgeMessageStream(bridgeSocket) ]
 
