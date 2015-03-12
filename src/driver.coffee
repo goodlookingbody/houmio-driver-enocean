@@ -62,7 +62,7 @@ openEnoceanMessageStream = (enoceanSerial) -> (cb) ->
 bridgeMessagesToSerial = (bridgeStream, serial) ->
   bridgeStream
     .filter isWriteMessage
-    .bufferingThrottle 10
+    .bufferingThrottle 25
     .onValue (message) ->
       serial.write message.data, ( -> )
       console.log "<-- Enocean:", toSemicolonSeparatedHexString(message.data)
