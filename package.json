@@ -14,5 +14,8 @@
   },
   "scripts": {
     "start": "coffee src/driver.coffee"
+  },
+  "engines": {
+    "node": "0.10.x"
   }
 }
