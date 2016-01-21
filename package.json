@@ -8,7 +8,7 @@
     "carrier": "^0.1.14",
     "coffee-script": "^1.8.0",
     "crc": "^2.1.1",
-    "serialport": "^1.4.6",
+    "serialport": "1.6.1",
     "winston": "^0.8.3",
     "zerofill": "^0.1.0"
   },
